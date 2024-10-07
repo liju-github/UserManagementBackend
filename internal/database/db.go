@@ -1,7 +1,6 @@
 package database
 
 import (
-	"errors"
 	"fmt"
 	"log"
 
@@ -12,35 +11,34 @@ import (
 	"gorm.io/gorm"
 )
 
-var DB *gorm.DB
 
+// ConnectDatabase initializes the connection to the database
 func ConnectDatabase(env config.Env) *gorm.DB {
+	// Database connection string (DSN)
 	dsn := fmt.Sprintf("%v:%v@tcp(127.0.0.1:3306)/%v?parseTime=true", env.DBUSER, env.DBPASSWORD, env.DBNAME)
 
-	DB, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	// Open MySQL database connection
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
-		log.Fatal("database connection failed")
+		log.Fatalf("Database connection failed: %v", err)
+		return nil
 	}
 
-	err = AutoMigrate(DB)
+	// Automigrate the models (creates tables if not exists)
+	err = AutoMigrate(db)
 	if err != nil {
-		log.Fatal(err.Error())
+		log.Fatalf("Failed to automigrate models: %v", err)
+		return nil
 	}
 
-	return DB
-
+	return db
 }
 
-func AutoMigrate(DB *gorm.DB) error {
-	err := DB.AutoMigrate(
+// AutoMigrate handles the automatic migration of models
+func AutoMigrate(db *gorm.DB) error {
+	return db.AutoMigrate(
 		&models.User{},
 		&models.Admin{},
 		&models.PasswordReset{},
 	)
-
-	if err != nil {
-		return errors.New("failed to automigrate models" )
-	}
-
-	return nil
 }
