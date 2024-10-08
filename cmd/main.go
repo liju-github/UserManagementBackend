@@ -20,7 +20,7 @@ func main() {
 
 	// Use the logger middleware
 	app.Use(logger.New(logger.Config{
-		Output:     os.Stdout, // Log to terminal
+		Output: os.Stdout, // Log to terminal
 		// Format:     "[${time}] ${status} - ${method} ${path} (${latency})\n",
 		TimeFormat: "02-Jan-2006 15:04:05",
 		TimeZone:   "Local",
@@ -42,7 +42,7 @@ func main() {
 
 	// Initialize services
 	userService := services.NewUserService(userRepo)
-	adminService := services.NewAdminService(adminRepo)
+	adminService := services.NewAdminService(adminRepo, userRepo)
 
 	// Initialize controllers
 	userController := controllers.NewUserController(userService)
@@ -54,14 +54,16 @@ func main() {
 	authGroup := app.Group("/api/auth")
 	authGroup.Post("/signup", userController.Signup)
 	authGroup.Post("/login", userController.Login)
-	authGroup.Post("/logout", userController.Logout)
-	authGroup.Post("/verify-email", userController.VerifyEmail)
+	authGroup.Post("/admin/login",adminController.Login)
+	// authGroup.Post("/logout", userController.Logout)
+	authGroup.Get("/verify-email/:token", userController.VerifyEmail)
 	authGroup.Post("/resend-verification", userController.ResendVerification)
 	authGroup.Post("/reset-password", userController.RequestPasswordReset)
 	authGroup.Post("/confirm-reset-password", userController.ConfirmPasswordReset)
 
 	// User group
 	userGroup := app.Group("/api/user")
+	userGroup.Use(controllers.JWTMiddleware)
 	userGroup.Get("/profile", userController.GetProfile)
 	userGroup.Put("/update", userController.UpdateProfile)
 	userGroup.Post("/upload-profile-picture", userController.UploadProfilePicture)
@@ -69,9 +71,9 @@ func main() {
 	// Admin group
 	adminGroup := app.Group("/api/admin")
 	adminGroup.Get("/users", adminController.GetAllUsers)
-	adminGroup.Delete("/users/:id", adminController.DeleteUser)
-	adminGroup.Post("/users/block/:id", adminController.BlockUser)
-	adminGroup.Post("/users/unblock/:id", adminController.UnblockUser)
+	adminGroup.Delete("/users/", adminController.DeleteUser)
+	adminGroup.Post("/users/block/", adminController.BlockUser)
+	adminGroup.Post("/users/unblock/", adminController.UnblockUser)
 
 	// Start the Fiber server
 	err := app.Listen(":8080")

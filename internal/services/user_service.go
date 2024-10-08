@@ -1,67 +1,212 @@
 package services
 
 import (
+	"crypto/rand"
+	"encoding/base64"
+	"errors"
+	"fmt"
+	"net/smtp"
+	"time"
+
 	"github.com/liju-github/user-management/internal/models"
 	"github.com/liju-github/user-management/internal/repository"
+	"golang.org/x/crypto/bcrypt"
 )
 
-
-
-// UserService struct that implements IUserService
 type UserService struct {
-	userRepo *repository.UserRepository // User repository interface
+	userRepo *repository.UserRepository
 }
 
-// ConfirmPasswordReset implements IUserService.
-func (u *UserService) ConfirmPasswordReset(token string, newPassword string) error {
-	panic("unimplemented")
-}
-
-// GetProfile implements IUserService.
-func (u *UserService) GetProfile(userID string) (*models.User, error) {
-	panic("unimplemented")
-}
-
-// Login implements IUserService.
-func (u *UserService) Login(email string, password string) (*models.User, error) {
-	panic("unimplemented")
-}
-
-// Logout implements IUserService.
-func (u *UserService) Logout(userID string) error {
-	panic("unimplemented")
-}
-
-// RequestPasswordReset implements IUserService.
-func (u *UserService) RequestPasswordReset(email string) error {
-	panic("unimplemented")
-}
-
-// ResendVerification implements IUserService.
-func (u *UserService) ResendVerification(user *models.User) error {
-	panic("unimplemented")
-}
-
-// Signup implements IUserService.
-func (u *UserService) Signup(user *models.User) error {
-	panic("unimplemented")
-}
-
-// UpdateProfile implements IUserService.
-func (u *UserService) UpdateProfile(user *models.User) error {
-	panic("unimplemented")
-}
-
-// VerifyEmail implements IUserService.
-func (u *UserService) VerifyEmail(token string) error {
-	panic("unimplemented")
-}
-
-// Constructor for UserService
 func NewUserService(userRepo *repository.UserRepository) *UserService {
-	return &UserService{
-		userRepo: userRepo, // Passing the interface
-	}
+	return &UserService{userRepo: userRepo}
 }
 
-// Implement service methods like Signup, Login, etc.
+func (s *UserService) Signup(user *models.UserSignupRequest) error {
+	existingUser, _ := s.userRepo.FindUserByEmail(user.Email)
+	if existingUser != nil {
+		return errors.New(models.UserAlreadyExists)
+	}
+
+	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
+	verificationToken := generateToken()
+
+	newUser := &models.User{
+		Name:               user.Name,
+		Email:              user.Email,
+		PasswordHash:       string(hashedPassword),
+		VerificationToken:  verificationToken,
+		VerificationExpiry: time.Now().Add(24 * time.Hour).Unix(),
+	}
+
+	if err := s.userRepo.CreateUser(newUser); err != nil {
+		return err
+	}
+
+	return s.sendVerificationEmail(newUser.Email, verificationToken)
+}
+
+func (s *UserService) Login(email, password string) (*models.User, error) {
+	user, err := s.userRepo.FindUserByEmail(email)
+	if err != nil {
+		return nil, errors.New(models.UserDoesntExist)
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
+		return nil, errors.New("invalid credentials")
+	}
+
+	if !user.IsVerified {
+		return nil, errors.New("email not verified")
+	}
+
+	return user, nil
+}
+
+func (s *UserService) Logout(userID string) error {
+	return nil
+}
+
+func (s *UserService) VerifyEmail(token string) error {
+	user, err := s.userRepo.FindUserByVerificationToken(token)
+	if err != nil {
+		return errors.New("invalid token")
+	}
+
+	if time.Now().Unix() > user.VerificationExpiry {
+		return errors.New("token expired")
+	}
+
+	user.IsVerified = true
+	user.VerificationToken = ""
+	user.VerificationExpiry = 0
+
+	return s.userRepo.UpdateUser(user)
+}
+
+func (s *UserService) ResendVerification(email string) error {
+	user, err := s.userRepo.FindUserByEmail(email)
+	if err != nil {
+		return errors.New(models.UserDoesntExist)
+	}
+
+	if user.IsVerified {
+		return errors.New("email already verified")
+	}
+
+	verificationToken := generateToken()
+	user.VerificationToken = verificationToken
+	user.VerificationExpiry = time.Now().Add(24 * time.Hour).Unix()
+
+	if err := s.userRepo.UpdateUser(user); err != nil {
+		return err
+	}
+
+	return s.sendVerificationEmail(user.Email, verificationToken)
+}
+
+func (s *UserService) RequestPasswordReset(email string) error {
+	user, err := s.userRepo.FindUserByEmail(email)
+	if err != nil {
+		return errors.New(models.UserDoesntExist)
+	}
+
+	resetToken := generateToken()
+	resetExpiry := time.Now().Add(1 * time.Hour).Unix()
+
+	passwordReset := &models.PasswordReset{
+		UserID:     user.ID,
+		ResetToken: resetToken,
+		Expiry:     resetExpiry,
+	}
+
+	if err := s.userRepo.CreatePasswordReset(passwordReset); err != nil {
+		return err
+	}
+
+	return s.sendPasswordResetEmail(user.Email, resetToken)
+}
+
+func (s *UserService) ConfirmPasswordReset(token, newPassword string) error {
+	passwordReset, err := s.userRepo.FindPasswordResetByToken(token)
+	if err != nil {
+		return errors.New("invalid token")
+	}
+
+	if time.Now().Unix() > passwordReset.Expiry {
+		return errors.New("token expired")
+	}
+
+	user, err := s.userRepo.FindUserByID(passwordReset.UserID)
+	if err != nil {
+		return errors.New(models.UserDoesntExist)
+	}
+
+	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	user.PasswordHash = string(hashedPassword)
+
+	if err := s.userRepo.UpdateUser(user); err != nil {
+		return err
+	}
+
+	return s.userRepo.DeletePasswordReset(passwordReset.ID)
+}
+
+func (s *UserService) GetProfile(userID string) (*models.User, error) {
+	return s.userRepo.FindUserByID(userID)
+}
+
+func (s *UserService) UpdateProfile(userID string,email string, req *models.UserUpdateRequest) error {
+    user := models.User{
+        ID:     userID,   
+		Email: email,       
+        Name:   req.Name,      
+        Age:    req.Age,         
+        Gender: req.Gender,      
+    }
+
+	fmt.Println("to be updated ",user)
+
+    return s.userRepo.UpdateUser(&user)
+}
+
+func (s *UserService) UploadProfilePicture(userID, cdnURL string) error {
+	user, err := s.userRepo.FindUserByID(userID)
+	if err != nil {
+		return errors.New(models.UserDoesntExist)
+	}
+
+	user.ImageURL = cdnURL
+	return s.userRepo.UpdateUser(user)
+}
+
+func generateToken() string {
+	b := make([]byte, 32)
+	rand.Read(b)
+	return base64.URLEncoding.EncodeToString(b)
+}
+
+func (s *UserService) sendVerificationEmail(email, token string) error {
+	from := "lijuthomasliju03@gmail.com"
+	password := "ciwg zzwn gpbs dekx" 
+	to := []string{"h4ze07@gmail.com"}
+	smtpHost := "smtp.gmail.com"
+	smtpPort := "587"
+
+	message := []byte("Subject: Email Verification\r\n" +
+		"\r\n" +
+		"Please verify your email by clicking the following link:\r\n" +
+		"http://example.com/verify?token=" + token)
+
+	auth := smtp.PlainAuth("", from, password, smtpHost)
+
+	err := smtp.SendMail(smtpHost+":"+smtpPort, auth, from, to, message)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *UserService) sendPasswordResetEmail(email, token string) error {
+	return s.sendVerificationEmail(email, token)
+}
