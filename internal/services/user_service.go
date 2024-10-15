@@ -28,21 +28,28 @@ func (s *UserService) Signup(user *models.UserSignupRequest) error {
 	}
 
 	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
-	verificationToken := generateToken()
+	// verificationToken := generateToken()
 
 	newUser := &models.User{
-		Name:               user.Name,
-		Email:              user.Email,
-		PasswordHash:       string(hashedPassword),
-		VerificationToken:  verificationToken,
-		VerificationExpiry: time.Now().Add(24 * time.Hour).Unix(),
+		Name:         user.Name,
+		Email:        user.Email,
+		PasswordHash: string(hashedPassword),
+		IsVerified:   true,
+		Age:          user.Age,
+		Gender:       user.Gender,
+		PhoneNumber:  user.PhoneNumber,
+		Address:      user.Address,
+		// VerificationToken:  verificationToken,
+		// VerificationExpiry: time.Now().Add(24 * time.Hour).Unix(),
 	}
 
 	if err := s.userRepo.CreateUser(newUser); err != nil {
 		return err
 	}
 
-	return s.sendVerificationEmail(newUser.Email, verificationToken)
+	// s.sendVerificationEmail(newUser.Email, verificationToken)
+
+	return nil
 }
 
 func (s *UserService) Login(email, password string) (*models.User, error) {
@@ -155,18 +162,23 @@ func (s *UserService) GetProfile(userID string) (*models.User, error) {
 	return s.userRepo.FindUserByID(userID)
 }
 
-func (s *UserService) UpdateProfile(userID string,email string, req *models.UserUpdateRequest) error {
-    user := models.User{
-        ID:     userID,   
-		Email: email,       
-        Name:   req.Name,      
-        Age:    req.Age,         
-        Gender: req.Gender,      
-    }
+func (s *UserService) UpdateProfile(userID string, email string, req *models.UserUpdateRequest) error {
+	// Find the existing user by ID
+	user, err := s.userRepo.FindUserByID(userID)
+	if err != nil {
+		return errors.New(models.UserDoesntExist)
+	}
 
-	fmt.Println("to be updated ",user)
+	// Update only the mutable fields
+	user.Name = req.Name
+	user.Age = req.Age
+	user.Gender = req.Gender
+	user.Address = req.Address
 
-    return s.userRepo.UpdateUser(&user)
+	fmt.Println("to be updated ", user)
+
+	// Call the repository to update the user in the database
+	return s.userRepo.UpdateUser(user) // Pass the updated user object
 }
 
 func (s *UserService) UploadProfilePicture(userID, cdnURL string) error {
@@ -187,7 +199,7 @@ func generateToken() string {
 
 func (s *UserService) sendVerificationEmail(email, token string) error {
 	from := "lijuthomasliju03@gmail.com"
-	password := "ciwg zzwn gpbs dekx" 
+	password := "ciwg zzwn gpbs dekx"
 	to := []string{"h4ze07@gmail.com"}
 	smtpHost := "smtp.gmail.com"
 	smtpPort := "587"

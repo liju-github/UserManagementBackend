@@ -8,11 +8,11 @@ import (
 )
 
 type Admin struct {
-	ID        string `gorm:"type:char(36);primaryKey" json:"id"` // UUID stored as string in MySQL
+	ID        string `gorm:"type:char(36);primaryKey" json:"id"` 
 	Name      string `gorm:"type:varchar(100);not null" json:"name"`
 	Email     string `gorm:"type:varchar(255);unique;not null" json:"email"`
 	Password  string `gorm:"type:varchar(100);not null" json:"password"`
-	CreatedAt int64  `json:"created_at"` // Unix timestamp for record creation
+	CreatedAt int64  `json:"created_at"` 
 }
 
 type AdminRequest struct {
@@ -20,9 +20,9 @@ type AdminRequest struct {
 	Password string `json:"password"`
 }
 
-// BeforeCreate hook to automatically set UUID and Unix timestamp before creating an admin record
+
 func (a *Admin) BeforeCreate(tx *gorm.DB) (err error) {
-	a.ID = uuid.New().String()      // Generate UUID for the admin
-	a.CreatedAt = time.Now().Unix() // Set the created_at field to the current Unix timestamp
+	a.ID = uuid.New().String()      
+	a.CreatedAt = time.Now().Unix() 
 	return nil
 }

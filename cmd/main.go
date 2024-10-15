@@ -6,30 +6,31 @@ import (
 	"os"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/liju-github/user-management/internal/config"
 	"github.com/liju-github/user-management/internal/controllers"
 	"github.com/liju-github/user-management/internal/database"
 	"github.com/liju-github/user-management/internal/repository"
 	"github.com/liju-github/user-management/internal/services"
+	"github.com/liju-github/user-management/internal/utils"
 )
 
 func main() {
 	// Initialize the Fiber app
 	app := fiber.New()
+	app.Use(cors.New())
 
 	// Use the logger middleware
 	app.Use(logger.New(logger.Config{
-		Output: os.Stdout, // Log to terminal
+		Output: os.Stdout, 
 		// Format:     "[${time}] ${status} - ${method} ${path} (${latency})\n",
 		TimeFormat: "02-Jan-2006 15:04:05",
 		TimeZone:   "Local",
 	}))
 
-	// Load environment configuration
 	envConfig := config.EnvConfig()
 
-	// Connect to the database
 	db := database.ConnectDatabase(envConfig)
 	if db == nil {
 		log.Fatal("Failed to connect to the database")
@@ -63,17 +64,19 @@ func main() {
 
 	// User group
 	userGroup := app.Group("/api/user")
-	userGroup.Use(controllers.JWTMiddleware)
+	userGroup.Use(utils.JWTMiddleware("user"))
+	userGroup.Get("/refresh",userController.GetRefreshToken)
 	userGroup.Get("/profile", userController.GetProfile)
 	userGroup.Put("/update", userController.UpdateProfile)
 	userGroup.Post("/upload-profile-picture", userController.UploadProfilePicture)
 
 	// Admin group
 	adminGroup := app.Group("/api/admin")
+	adminGroup.Use(utils.JWTMiddleware("admin"))
 	adminGroup.Get("/users", adminController.GetAllUsers)
 	adminGroup.Delete("/users/", adminController.DeleteUser)
-	adminGroup.Post("/users/block/", adminController.BlockUser)
-	adminGroup.Post("/users/unblock/", adminController.UnblockUser)
+	adminGroup.Put("/users/block/", adminController.BlockUser)
+	adminGroup.Put("/users/unblock/", adminController.UnblockUser)
 
 	// Start the Fiber server
 	err := app.Listen(":8080")
