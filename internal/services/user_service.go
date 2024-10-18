@@ -39,6 +39,7 @@ func (s *UserService) Signup(user *models.UserSignupRequest) error {
 		Gender:       user.Gender,
 		PhoneNumber:  user.PhoneNumber,
 		Address:      user.Address,
+		ImageURL: user.ImageURL,
 		// VerificationToken:  verificationToken,
 		// VerificationExpiry: time.Now().Add(24 * time.Hour).Unix(),
 	}

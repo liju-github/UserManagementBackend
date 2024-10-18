@@ -23,7 +23,7 @@ func main() {
 
 	// Use the logger middleware
 	app.Use(logger.New(logger.Config{
-		Output: os.Stdout, 
+		Output: os.Stdout,
 		// Format:     "[${time}] ${status} - ${method} ${path} (${latency})\n",
 		TimeFormat: "02-Jan-2006 15:04:05",
 		TimeZone:   "Local",
@@ -44,35 +44,36 @@ func main() {
 	// Initialize services
 	userService := services.NewUserService(userRepo)
 	adminService := services.NewAdminService(adminRepo, userRepo)
+	authService := services.NewAuthService(adminRepo, userRepo)
 
 	// Initialize controllers
 	userController := controllers.NewUserController(userService)
 	adminController := controllers.NewAdminController(adminService)
+	authController := controllers.NewAuthController(authService)
 
-	fmt.Println(userController, adminController)
+	fmt.Println(userController, adminController, authController)
 
 	// Auth group
 	authGroup := app.Group("/api/auth")
 	authGroup.Post("/signup", userController.Signup)
 	authGroup.Post("/login", userController.Login)
-	authGroup.Post("/admin/login",adminController.Login)
-	// authGroup.Post("/logout", userController.Logout)
+	authGroup.Post("/admin/login", adminController.Login)
 	authGroup.Get("/verify-email/:token", userController.VerifyEmail)
 	authGroup.Post("/resend-verification", userController.ResendVerification)
 	authGroup.Post("/reset-password", userController.RequestPasswordReset)
 	authGroup.Post("/confirm-reset-password", userController.ConfirmPasswordReset)
+	authGroup.Get("/refresh", utils.JWTMiddleware("",userRepo), authController.GetRefreshToken)
 
 	// User group
 	userGroup := app.Group("/api/user")
-	userGroup.Use(utils.JWTMiddleware("user"))
-	userGroup.Get("/refresh",userController.GetRefreshToken)
+	userGroup.Use(utils.JWTMiddleware("user",userRepo))
 	userGroup.Get("/profile", userController.GetProfile)
 	userGroup.Put("/update", userController.UpdateProfile)
 	userGroup.Post("/upload-profile-picture", userController.UploadProfilePicture)
 
 	// Admin group
 	adminGroup := app.Group("/api/admin")
-	adminGroup.Use(utils.JWTMiddleware("admin"))
+	adminGroup.Use(utils.JWTMiddleware("admin", userRepo))
 	adminGroup.Get("/users", adminController.GetAllUsers)
 	adminGroup.Delete("/users/", adminController.DeleteUser)
 	adminGroup.Put("/users/block/", adminController.BlockUser)

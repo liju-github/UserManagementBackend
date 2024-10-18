@@ -36,17 +36,17 @@ func (ac *AdminController) Login(c *fiber.Ctx) error {
 	}
 
 	
-	token, err := utils.GenerateJWT(authAdmin.Email, authAdmin.ID, "admin",72)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Could not generate token",
-		})
+	accessToken, accessErr := utils.GenerateJWT(admin.Email, authAdmin.ID, "admin", 1)
+	refreshToken, refreshErr := utils.GenerateJWT(admin.Email, authAdmin.ID, "admin", 72)
+	if accessErr != nil || refreshErr != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to generate token"})
 	}
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"message": "Login successful",
-		"admin":   authAdmin,
-		"token":   token,
+		"message":       "Admin Login successful",
+		"user":          authAdmin,
+		"token":         accessToken,
+		"refresh_token": refreshToken,
 	})
 }
 
@@ -72,7 +72,9 @@ func (ac *AdminController) GetAllUsers(c *fiber.Ctx) error {
 			Email:      user.Email,
 			Age:        user.Age,
 			Gender:     user.Gender,
+			PhoneNumber: user.PhoneNumber,
 			Address:    user.Address,
+			ImageURL: user.ImageURL,
 			IsVerified: user.IsVerified,
 			IsBlocked:  user.IsBlocked,
 			CreatedAt: user.CreatedAt.String(),

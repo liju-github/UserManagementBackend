@@ -53,6 +53,7 @@ type UserSignupRequest struct {
 	Address     string `json:"address"`
 	PhoneNumber uint   `json:"phonenumber"`
 	Password    string `json:"password"`
+	ImageURL    string `json:"image_url"`
 }
 
 type UserLoginRequest struct {
@@ -67,6 +68,7 @@ type UserProfileResponse struct {
 	Gender     string `json:"gender"`
 	Email      string `json:"email"`
 	Address    string `json:"address"`
+	PhoneNumber uint `json:"phonenumber"`
 	ImageURL   string `json:"image_url,omitempty"`
 	IsVerified bool   `json:"is_verified"`
 	IsBlocked  bool   `json:"is_blocked"`
@@ -79,4 +81,5 @@ type UserUpdateRequest struct {
 	Age     uint   `json:"age"`
 	Gender  string `json:"gender"`
 	Address string `json:"address"`
+	ImageURL   string `json:"image_url,omitempty"`
 }

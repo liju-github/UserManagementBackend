@@ -48,6 +48,11 @@ func (c *UserController) Login(ctx *fiber.Ctx) error {
 		return ctx.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": err.Error()})
 	}
 
+	if user.IsBlocked{
+		return ctx.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "User is Blocked"})
+
+	}
+
 	accessToken, accessErr := utils.GenerateJWT(user.Email, user.ID, "user", 1)
 	refreshToken, refreshErr := utils.GenerateJWT(user.Email, user.ID, "user", 72)
 	if accessErr != nil || refreshErr != nil {
@@ -62,21 +67,10 @@ func (c *UserController) Login(ctx *fiber.Ctx) error {
 	})
 }
 
-func (c *UserController) GetRefreshToken(ctx *fiber.Ctx) error {
-	userID := ctx.Locals("userID").(string)
-	userEmail := ctx.Locals("email").(string)
-	
-	accessToken, accessErr := utils.GenerateJWT(userEmail, userID, "user", 1)
-	if accessErr != nil {
-		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to generate token"})
-	}
-
-	return ctx.Status(fiber.StatusOK).JSON(fiber.Map{"token": accessToken})
-}
 
 func (c *UserController) Logout(ctx *fiber.Ctx) error {
-	userID := ctx.Locals("userID").(string)
-	if err := c.userService.Logout(userID); err != nil {
+	ID := ctx.Locals("ID").(string)
+	if err := c.userService.Logout(ID); err != nil {
 		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 
@@ -143,12 +137,12 @@ func (c *UserController) ConfirmPasswordReset(ctx *fiber.Ctx) error {
 }
 
 func (c *UserController) GetProfile(ctx *fiber.Ctx) error {
-	userID, ok := ctx.Locals("userID").(string)
-	if !ok || userID == "" {
+	ID, ok := ctx.Locals("ID").(string)
+	if !ok || ID == "" {
 		return ctx.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Unauthorized or invalid user ID"})
 	}
 
-	user, err := c.userService.GetProfile(userID)
+	user, err := c.userService.GetProfile(ID)
 	if err != nil {
 		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
@@ -180,15 +174,15 @@ func (c *UserController) UpdateProfile(ctx *fiber.Ctx) error {
 	if err := ctx.BodyParser(&updateReq); err != nil {
 		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid input" + err.Error()})
 	}
-	userID := ""
+	ID := ""
 
 	if updateReq.ID != "" {
-		userID = updateReq.ID
+		ID = updateReq.ID
 	} else {
-		userID, _ = ctx.Locals("userID").(string)
+		ID, _ = ctx.Locals("ID").(string)
 	}
 
-	if err := c.userService.UpdateProfile(userID, email, &updateReq); err != nil {
+	if err := c.userService.UpdateProfile(ID, email, &updateReq); err != nil {
 		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 
@@ -196,7 +190,7 @@ func (c *UserController) UpdateProfile(ctx *fiber.Ctx) error {
 }
 
 func (c *UserController) UploadProfilePicture(ctx *fiber.Ctx) error {
-	userID := ctx.Locals("userID").(string)
+	ID := ctx.Locals("ID").(string)
 
 	type ImageUploadRequest struct {
 		ImageURL string `json:"image_url"`
@@ -213,7 +207,7 @@ func (c *UserController) UploadProfilePicture(ctx *fiber.Ctx) error {
 		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid URL format"})
 	}
 
-	if err := c.userService.UploadProfilePicture(userID, req.ImageURL); err != nil {
+	if err := c.userService.UploadProfilePicture(ID, req.ImageURL); err != nil {
 		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 

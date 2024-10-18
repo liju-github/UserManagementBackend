@@ -6,21 +6,21 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v4"
+	"github.com/liju-github/user-management/internal/repository"
 )
 
-func GenerateJWT(email string, userID string, role string,expiry uint) (string, error) {
+func GenerateJWT(email string, ID string, role string, expiry uint) (string, error) {
 	claims := jwt.MapClaims{
-		"email":  email,
-		"userID": userID,
-		"exp":    time.Now().Add(time.Hour * time.Duration(expiry)).Unix(),
-		"role":   role,
+		"email": email,
+		"ID":    ID,
+		"exp":   time.Now().Add(time.Hour * time.Duration(expiry)).Unix(),
+		"role":  role,
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte("secret"))
 }
 
-
-func JWTMiddleware(requiredRole string) fiber.Handler {
+func JWTMiddleware(requiredRole string, userDB *repository.UserRepository) fiber.Handler {
 	return func(ctx *fiber.Ctx) error {
 		authHeader := ctx.Get("Authorization")
 		if authHeader == "" {
@@ -49,16 +49,15 @@ func JWTMiddleware(requiredRole string) fiber.Handler {
 			return ctx.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Token has expired"})
 		}
 
-		// Check if the role matches the required role
+		// Extract role from JWT claims
 		clientRole, ok := claims["role"].(string)
 		if !ok {
 			return ctx.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid role in token"})
 		}
 
-		// Allow admin to access PUT, POST, DELETE methods without restrictions
-		if clientRole == "admin" && (ctx.Method() == "PUT" || ctx.Method() == "POST" || ctx.Method() == "DELETE") {
-			// Admin exception: allow PUT, POST, DELETE requests
-			ctx.Locals("userID", claims["userID"])
+		// Allow admin to access all routes except GET
+		if clientRole == "admin" {
+			ctx.Locals("ID", claims["ID"])
 			ctx.Locals("email", claims["email"])
 			ctx.Locals("expiry", claims["exp"])
 			ctx.Locals("role", claims["role"])
@@ -66,8 +65,22 @@ func JWTMiddleware(requiredRole string) fiber.Handler {
 			return ctx.Next() // Admin can proceed
 		}
 
-		// Set user details in context locals for regular users
-		ctx.Locals("userID", claims["userID"])
+		// If a requiredRole is provided, ensure the user has that role
+		if requiredRole != "" && requiredRole != clientRole {
+			return ctx.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Insufficient privileges"})
+		}
+
+
+		userInfo,err := userDB.FindUserByID(claims["ID"].(string))
+		if err!=nil {
+			return ctx.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Please try again"})
+		}
+		if userInfo.IsBlocked{
+			return ctx.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "user is blocked"})
+		}
+
+		// Set user details in context locals
+		ctx.Locals("ID", claims["ID"])
 		ctx.Locals("email", claims["email"])
 		ctx.Locals("expiry", claims["exp"])
 		ctx.Locals("role", claims["role"])
