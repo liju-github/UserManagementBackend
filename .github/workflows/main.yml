@@ -2,48 +2,30 @@ name: CI/CD Pipeline for UserManagementBackend
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: Set up Go
-        uses: actions/setup-go@v2
-        with:
-          go-version: '1.20'
-
-      - name: Install dependencies
-        run: |
-          cd UserManagementBackend
-          go mod tidy
-
-      - name: Build the application
-        run: |
-          cd UserManagementBackend
-          go build -o ./main.exe ./cmd/main.go
-
       - name: Deploy to EC2
-        uses: appleboy/scp-action@v0.1.0
-        with:
-          host: ${{ secrets.EC2_IP }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          port: 22
-          source: "./UserManagementBackend/main.exe"
-          target: "/home/ubuntu/UserManagementBackend/main.exe"
-
-      - name: Restart the service
-        uses: appleboy/ssh-action@v0.1.0
-        with:
-          host: ${{ secrets.EC2_IP }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          port: 22
-          script: |
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          EC2_USER: ${{ secrets.EC2_USER }}  
+          EC2_IP: ${{ secrets.EC2_IP }}
+        run: |
+          # Setup SSH
+          echo "$SSH_KEY" > key.pem
+          chmod 600 key.pem
+          
+          # Deploy
+          ssh -i key.pem -o StrictHostKeyChecking=no $EC2_USER@$EC2_IP '
+            cd ~/UserManagementBackend
+            git pull origin main
+            go mod tidy
+            go build -o main ./cmd/main.go
             sudo systemctl restart usermanagement.service
+          '
+          
+          # Cleanup
+          rm -f key.pem
