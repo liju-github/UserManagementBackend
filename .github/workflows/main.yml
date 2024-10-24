@@ -8,24 +8,49 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy to EC2
+    
+      # Step 1: Setup SSH Key
+      - name: Setup SSH Key
         env:
           SSH_KEY: ${{ secrets.SSH_KEY }}
-          EC2_USER: ${{ secrets.EC2_USER }}  
-          EC2_IP: ${{ secrets.EC2_IP }}
         run: |
-          # Setup SSH
           echo "$SSH_KEY" > key.pem
           chmod 600 key.pem
-          
-          # Deploy
+
+      # Step 2: Connect to EC2 and Pull Latest Code
+      - name: Pull Latest Code from Git
+        env:
+          EC2_USER: ${{ secrets.EC2_USER }}
+          EC2_IP: ${{ secrets.EC2_IP }}
+        run: |
           ssh -i key.pem -o StrictHostKeyChecking=no $EC2_USER@$EC2_IP '
             cd ~/UserManagementBackend
             git pull origin main
+          '
+
+      # Step 3: Build Go Application
+      - name: Build Go Application
+        env:
+          EC2_USER: ${{ secrets.EC2_USER }}
+          EC2_IP: ${{ secrets.EC2_IP }}
+        run: |
+          ssh -i key.pem -o StrictHostKeyChecking=no $EC2_USER@$EC2_IP '
+            cd ~/UserManagementBackend
             go mod tidy
             go build -o main.exe ./cmd/main.go
+          '
+
+      # Step 4: Restart Application Service
+      - name: Restart Application Service
+        env:
+          EC2_USER: ${{ secrets.EC2_USER }}
+          EC2_IP: ${{ secrets.EC2_IP }}
+        run: |
+          ssh -i key.pem -o StrictHostKeyChecking=no $EC2_USER@$EC2_IP '
             sudo systemctl restart usermanagement.service
           '
-          
-          # Cleanup
+
+      # Step 5: Cleanup SSH Key
+      - name: Cleanup
+        run: |
           rm -f key.pem
