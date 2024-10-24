@@ -20,6 +20,9 @@ func main() {
 	// Initialize the Fiber app
 	app := fiber.New()
 	app.Use(cors.New())
+	app.Get("/", func(c *fiber.Ctx) error {
+		return c.Status(fiber.StatusCreated).JSON(fiber.Map{"message": "server is running"})
+	})
 
 	// Use the logger middleware
 	app.Use(logger.New(logger.Config{
@@ -62,11 +65,11 @@ func main() {
 	authGroup.Post("/resend-verification", userController.ResendVerification)
 	authGroup.Post("/reset-password", userController.RequestPasswordReset)
 	authGroup.Post("/confirm-reset-password", userController.ConfirmPasswordReset)
-	authGroup.Get("/refresh", utils.JWTMiddleware("",userRepo), authController.GetRefreshToken)
+	authGroup.Get("/refresh", utils.JWTMiddleware("", userRepo), authController.GetRefreshToken)
 
 	// User group
 	userGroup := app.Group("/api/user")
-	userGroup.Use(utils.JWTMiddleware("user",userRepo))
+	userGroup.Use(utils.JWTMiddleware("user", userRepo))
 	userGroup.Get("/profile", userController.GetProfile)
 	userGroup.Put("/update", userController.UpdateProfile)
 	userGroup.Post("/upload-profile-picture", userController.UploadProfilePicture)
