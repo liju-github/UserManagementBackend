@@ -23,13 +23,9 @@ jobs:
             cd ~/UserManagementBackend
             git pull origin main
             go mod tidy
-            go build -o main ./cmd/main.go
+            go build -o main.exe ./cmd/main.go
             sudo systemctl restart usermanagement.service
           '
           
           # Cleanup
-<<<<<<< HEAD
           rm -f key.pem
-=======
-          rm -f key.pem
->>>>>>> 59f8c75 (added health route)
