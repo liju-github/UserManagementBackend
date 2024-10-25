@@ -238,9 +238,9 @@ func TestLogin(t *testing.T) {
 		name               string
 		requestBody        models.UserLoginRequest
 		expectedStatusCode int
-		mockError         error
-		userBlocked       bool
-		validateResponse  func(t *testing.T, response map[string]interface{})
+		mockError          error
+		userBlocked        bool
+		validateResponse   func(t *testing.T, response map[string]interface{})
 	}{
 		{
 			name: "successful login",
@@ -249,8 +249,8 @@ func TestLogin(t *testing.T) {
 				Password: "SecurePass@123",
 			},
 			expectedStatusCode: fiber.StatusOK,
-			mockError:         nil,
-			userBlocked:       false,
+			mockError:          nil,
+			userBlocked:        false,
 			validateResponse: func(t *testing.T, response map[string]interface{}) {
 				assert.Equal(t, models.LoginSuccessful, response["message"])
 				assert.NotEmpty(t, response["token"])
@@ -268,8 +268,8 @@ func TestLogin(t *testing.T) {
 				Password: "",
 			},
 			expectedStatusCode: fiber.StatusBadRequest,
-			mockError:         nil,
-			userBlocked:       false,
+			mockError:          nil,
+			userBlocked:        false,
 			validateResponse: func(t *testing.T, response map[string]interface{}) {
 				assert.Equal(t, models.InvalidInput, response["error"])
 			},
@@ -281,8 +281,8 @@ func TestLogin(t *testing.T) {
 				Password: "SecurePass@123",
 			},
 			expectedStatusCode: fiber.StatusBadRequest,
-			mockError:         nil,
-			userBlocked:       false,
+			mockError:          nil,
+			userBlocked:        false,
 			validateResponse: func(t *testing.T, response map[string]interface{}) {
 				assert.Equal(t, models.InvalidInput, response["error"])
 			},
@@ -294,8 +294,8 @@ func TestLogin(t *testing.T) {
 				Password: "SecurePass@123",
 			},
 			expectedStatusCode: fiber.StatusUnauthorized,
-			mockError:         nil,
-			userBlocked:       true,
+			mockError:          nil,
+			userBlocked:        true,
 			validateResponse: func(t *testing.T, response map[string]interface{}) {
 				assert.Equal(t, models.UserIsBlocked, response["error"])
 			},
@@ -307,8 +307,8 @@ func TestLogin(t *testing.T) {
 				Password: "WrongPass@123",
 			},
 			expectedStatusCode: fiber.StatusUnauthorized,
-			mockError:         errors.New(models.InvalidInput),
-			userBlocked:       false,
+			mockError:          errors.New(models.InvalidInput),
+			userBlocked:        false,
 			validateResponse: func(t *testing.T, response map[string]interface{}) {
 				assert.Equal(t, models.InvalidInput, response["error"])
 			},
@@ -347,6 +347,64 @@ func TestLogin(t *testing.T) {
 			assert.NoError(t, err)
 
 			test.validateResponse(t, response)
+		})
+	}
+}
+
+func TestGetProfile(t *testing.T) {
+	app := fiber.New()
+
+	app.Use(func(c *fiber.Ctx) error {
+		userID := c.Get("X-User-ID")
+		if userID != "" {
+			c.Locals("ID", userID)
+		}
+		return c.Next()
+	})
+
+	app.Get("/profile", func(ctx *fiber.Ctx) error {
+		ID, ok := ctx.Locals("ID").(string)
+		if !ok || ID == "" {
+			return ctx.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": models.InvalidID})
+		}
+		return ctx.Status(fiber.StatusOK).JSON(fiber.Map{"message": "Success", "ID": ID})
+	})
+
+	tests := []struct {
+		name               string
+		userID             string
+		expectedStatusCode int
+		expectedResponse   map[string]interface{}
+	}{
+		{
+			name:               "Successful profile retrieval",
+			userID:             "123",
+			expectedStatusCode: fiber.StatusOK,
+			expectedResponse:   map[string]interface{}{"message": "Success", "ID": "123"},
+		},
+		{
+			name:               "Unauthorized access - missing user ID",
+			userID:             "",
+			expectedStatusCode: fiber.StatusUnauthorized,
+			expectedResponse:   map[string]interface{}{"error": "Unauthorized or invalid user ID"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/profile", nil)
+			req.Header.Set("Content-Type", "application/json")
+			if test.userID != "" {
+				req.Header.Set("X-User-ID", test.userID)
+			}
+
+			resp, err := app.Test(req, -1)
+			assert.NoError(t, err)
+			assert.Equal(t, test.expectedStatusCode, resp.StatusCode)
+
+			var response map[string]interface{}
+			json.NewDecoder(resp.Body).Decode(&response)
+			assert.Equal(t, test.expectedResponse, response)
 		})
 	}
 }

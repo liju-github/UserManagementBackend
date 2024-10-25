@@ -21,4 +21,5 @@ const (
 	ErrNegativeAge                     = "age must be positive"
 	ErrPasswordComplexity              = "password must contain at least one uppercase letter, one lowercase letter, one number, and one special character"
 	ErrPasswordLength                  = "password must be between %d and %d characters"
+	InvalidID = "Unauthorized or invalid user ID"
 )

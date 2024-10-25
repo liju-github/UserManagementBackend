@@ -144,7 +144,7 @@ func (c *UserController) ConfirmPasswordReset(ctx *fiber.Ctx) error {
 func (c *UserController) GetProfile(ctx *fiber.Ctx) error {
 	ID, ok := ctx.Locals("ID").(string)
 	if !ok || ID == "" {
-		return ctx.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Unauthorized or invalid user ID"})
+		return ctx.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": models.InvalidID})
 	}
 
 	user, err := c.userService.GetProfile(ID)
