@@ -12,61 +12,66 @@ import (
 )
 
 type UserController struct {
-	userService *services.UserService
+	userService services.IUserService
 }
 
-func NewUserController(userService *services.UserService) *UserController {
+func NewUserController(userService services.IUserService) *UserController {
 	return &UserController{userService: userService}
 }
 
 func (c *UserController) Signup(ctx *fiber.Ctx) error {
-	var userReq models.UserSignupRequest
-	if err := ctx.BodyParser(&userReq); err != nil {
-		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid input" + err.Error()})
-	}
+    var userReq models.UserSignupRequest
+    if err := ctx.BodyParser(&userReq); err != nil {
+        return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": models.InvalidInput})
+    }
 
-	fmt.Println(userReq)
+    if err := models.Validate(userReq); err != nil {
+        return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+    }
 
-	if err := c.userService.Signup(&userReq); err != nil {
-		if err.Error() == models.UserAlreadyExists {
-			return ctx.Status(fiber.StatusConflict).JSON(fiber.Map{"error": err.Error()})
-		}
-		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
-	}
+    if err := c.userService.Signup(&userReq); err != nil {
+        if err.Error() == models.UserAlreadyExists {
+            return ctx.Status(fiber.StatusConflict).JSON(fiber.Map{"error": err.Error()})
+        }
+        return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+    }
 
-	return ctx.Status(fiber.StatusCreated).JSON(fiber.Map{"message": "User signed up successfully!"})
+    return ctx.Status(fiber.StatusCreated).JSON(fiber.Map{"message": models.SignupSuccessful})
 }
 
 func (c *UserController) Login(ctx *fiber.Ctx) error {
-	var loginReq models.UserLoginRequest
-	if err := ctx.BodyParser(&loginReq); err != nil {
-		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid input"})
-	}
+    var loginReq models.UserLoginRequest
+    if err := ctx.BodyParser(&loginReq); err != nil {
+        return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": models.InvalidInput})
+    }
 
-	user, err := c.userService.Login(loginReq.Email, loginReq.Password)
-	if err != nil {
-		return ctx.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": err.Error()})
-	}
+    // Basic validation for login request
+    if loginReq.Email == "" || loginReq.Password == "" {
+        return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": models.InvalidInput})
+    }
 
-	if user.IsBlocked{
-		return ctx.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "User is Blocked"})
+    user, err := c.userService.Login(loginReq.Email, loginReq.Password)
+    if err != nil {
+        return ctx.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": err.Error()})
+    }
 
-	}
+    if user.IsBlocked {
+        return ctx.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": models.UserIsBlocked})
+    }
 
-	accessToken, accessErr := utils.GenerateJWT(user.Email, user.ID, "user", 1)
-	refreshToken, refreshErr := utils.GenerateJWT(user.Email, user.ID, "user", 72)
-	if accessErr != nil || refreshErr != nil {
-		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to generate token"})
-	}
+    accessToken, accessErr := utils.GenerateJWT(user.Email, user.ID, "user", 1)
+    refreshToken, refreshErr := utils.GenerateJWT(user.Email, user.ID, "user", 72)
+    if accessErr != nil || refreshErr != nil {
+        return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to generate token"})
+    }
 
-	return ctx.Status(fiber.StatusOK).JSON(fiber.Map{
-		"message":       "Login successful",
-		"user":          user,
-		"token":         accessToken,
-		"refresh_token": refreshToken,
-	})
+    return ctx.Status(fiber.StatusOK).JSON(fiber.Map{
+        "message":       models.LoginSuccessful,
+        "user":          user,
+        "token":         accessToken,
+        "refresh_token": refreshToken,
+    })
 }
-
 
 func (c *UserController) Logout(ctx *fiber.Ctx) error {
 	ID := ctx.Locals("ID").(string)
@@ -74,7 +79,7 @@ func (c *UserController) Logout(ctx *fiber.Ctx) error {
 		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	return ctx.Status(fiber.StatusOK).JSON(fiber.Map{"message": "Logout successful"})
+	return ctx.Status(fiber.StatusOK).JSON(fiber.Map{"message": models.LogoutSuccessful})
 }
 
 func (c *UserController) VerifyEmail(ctx *fiber.Ctx) error {
@@ -87,7 +92,7 @@ func (c *UserController) VerifyEmail(ctx *fiber.Ctx) error {
 		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	return ctx.Status(fiber.StatusOK).JSON(fiber.Map{"message": "Email verified successfully"})
+	return ctx.Status(fiber.StatusOK).JSON(fiber.Map{"message": models.EmailVerifiedSuccessfully})
 }
 
 func (c *UserController) ResendVerification(ctx *fiber.Ctx) error {
@@ -95,14 +100,14 @@ func (c *UserController) ResendVerification(ctx *fiber.Ctx) error {
 		Email string `json:"email"`
 	}
 	if err := ctx.BodyParser(&req); err != nil {
-		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid input"})
+		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": models.InvalidInput})
 	}
 
 	if err := c.userService.ResendVerification(req.Email); err != nil {
 		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	return ctx.Status(fiber.StatusOK).JSON(fiber.Map{"message": "Verification email resent"})
+	return ctx.Status(fiber.StatusOK).JSON(fiber.Map{"message": models.VerificationEmailResent})
 }
 
 func (c *UserController) RequestPasswordReset(ctx *fiber.Ctx) error {
@@ -110,14 +115,14 @@ func (c *UserController) RequestPasswordReset(ctx *fiber.Ctx) error {
 		Email string `json:"email"`
 	}
 	if err := ctx.BodyParser(&req); err != nil {
-		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid input"})
+		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": models.InvalidInput})
 	}
 
 	if err := c.userService.RequestPasswordReset(req.Email); err != nil {
 		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	return ctx.Status(fiber.StatusOK).JSON(fiber.Map{"message": "Password reset email sent"})
+	return ctx.Status(fiber.StatusOK).JSON(fiber.Map{"message": models.PasswordResetEmailSent})
 }
 
 func (c *UserController) ConfirmPasswordReset(ctx *fiber.Ctx) error {
@@ -126,14 +131,14 @@ func (c *UserController) ConfirmPasswordReset(ctx *fiber.Ctx) error {
 		NewPassword string `json:"new_password"`
 	}
 	if err := ctx.BodyParser(&req); err != nil {
-		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid input"})
+		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": models.InvalidInput})
 	}
 
 	if err := c.userService.ConfirmPasswordReset(req.Token, req.NewPassword); err != nil {
 		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	return ctx.Status(fiber.StatusOK).JSON(fiber.Map{"message": "Password reset successfully"})
+	return ctx.Status(fiber.StatusOK).JSON(fiber.Map{"message": models.PasswordResetSuccessfully})
 }
 
 func (c *UserController) GetProfile(ctx *fiber.Ctx) error {
@@ -166,13 +171,12 @@ func (c *UserController) GetProfile(ctx *fiber.Ctx) error {
 }
 
 func (c *UserController) UpdateProfile(ctx *fiber.Ctx) error {
-
 	email, _ := ctx.Locals("email").(string)
 	fmt.Println(email)
 
 	var updateReq models.UserUpdateRequest
 	if err := ctx.BodyParser(&updateReq); err != nil {
-		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid input" + err.Error()})
+		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": models.InvalidInput + ": " + err.Error()})
 	}
 	ID := ""
 
@@ -186,7 +190,7 @@ func (c *UserController) UpdateProfile(ctx *fiber.Ctx) error {
 		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	return ctx.Status(fiber.StatusOK).JSON(fiber.Map{"message": "Profile updated successfully"})
+	return ctx.Status(fiber.StatusOK).JSON(fiber.Map{"message": models.ProfileUpdatedSuccessfully})
 }
 
 func (c *UserController) UploadProfilePicture(ctx *fiber.Ctx) error {
@@ -211,5 +215,5 @@ func (c *UserController) UploadProfilePicture(ctx *fiber.Ctx) error {
 		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	return ctx.Status(fiber.StatusOK).JSON(fiber.Map{"message": "Profile picture uploaded successfully", "url": req.ImageURL})
+	return ctx.Status(fiber.StatusOK).JSON(fiber.Map{"message": models.ProfilePictureUploadedSuccessfully})
 }

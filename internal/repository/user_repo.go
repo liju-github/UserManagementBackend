@@ -11,6 +11,16 @@ type UserRepository struct {
 	MySQLDatabase *gorm.DB
 }
 
+type IUserRepository interface {
+    FindUserByEmail(string) (*models.User, error)
+    CreateUser(*models.User) error
+    UpdateUser(*models.User) error
+    FindUserByID(string) (*models.User, error)
+    FindUserByVerificationToken(string) (*models.User, error)
+    CreatePasswordReset(*models.PasswordReset) error
+    FindPasswordResetByToken(string) (*models.PasswordReset, error)
+    DeletePasswordReset(string) error
+}
 
 func NewUserRepository(db *gorm.DB) *UserRepository {
 	return &UserRepository{MySQLDatabase: db}

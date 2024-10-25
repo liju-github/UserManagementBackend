@@ -46,14 +46,14 @@ func (pr *PasswordReset) BeforeCreate(tx *gorm.DB) (err error) {
 }
 
 type UserSignupRequest struct {
-	Name        string `json:"name"`
-	Email       string `json:"email"`
-	Age         uint   `json:"age"`
-	Gender      string `json:"gender"`
-	Address     string `json:"address"`
-	PhoneNumber uint   `json:"phonenumber"`
-	Password    string `json:"password"`
-	ImageURL    string `json:"image_url"`
+	Name        string `json:"name" validate:"required,min=3,max=50"`
+	Email       string `json:"email" validate:"required,email"`
+	Age         uint   `json:"age" validate:"required,gte=18,lte=120"` // Validating age between 18 and 120
+	Gender      string `json:"gender" validate:"required,oneof=Male Female Other"`
+	Address     string `json:"address" validate:"required,min=5,max=100"`
+	PhoneNumber uint   `json:"phonenumber" validate:"required,numeric,min=1000000000,max=9999999999"` // Validating as a number
+	Password    string `json:"password" validate:"required,min=8"`
+	ImageURL    string `json:"image_url" validate:"required,url"`
 }
 
 type UserLoginRequest struct {
@@ -62,24 +62,24 @@ type UserLoginRequest struct {
 }
 
 type UserProfileResponse struct {
-	ID         string `json:"id"`
-	Name       string `json:"name"`
-	Age        uint   `json:"age"`
-	Gender     string `json:"gender"`
-	Email      string `json:"email"`
-	Address    string `json:"address"`
-	PhoneNumber uint `json:"phonenumber"`
-	ImageURL   string `json:"image_url,omitempty"`
-	IsVerified bool   `json:"is_verified"`
-	IsBlocked  bool   `json:"is_blocked"`
-	CreatedAt  string `json:"created_at"`
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Age         uint   `json:"age"`
+	Gender      string `json:"gender"`
+	Email       string `json:"email"`
+	Address     string `json:"address"`
+	PhoneNumber uint   `json:"phonenumber"`
+	ImageURL    string `json:"image_url,omitempty"`
+	IsVerified  bool   `json:"is_verified"`
+	IsBlocked   bool   `json:"is_blocked"`
+	CreatedAt   string `json:"created_at"`
 }
 
 type UserUpdateRequest struct {
-	ID      string `json:"id"`
-	Name    string `json:"name"`
-	Age     uint   `json:"age"`
-	Gender  string `json:"gender"`
-	Address string `json:"address"`
-	ImageURL   string `json:"image_url,omitempty"`
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Age      uint   `json:"age"`
+	Gender   string `json:"gender"`
+	Address  string `json:"address"`
+	ImageURL string `json:"image_url,omitempty"`
 }

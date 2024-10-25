@@ -4,7 +4,6 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
-	"fmt"
 	"net/smtp"
 	"time"
 
@@ -13,11 +12,24 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-type UserService struct {
-	userRepo *repository.UserRepository
+type IUserService interface {
+	Signup(user *models.UserSignupRequest) error
+	Login(email, password string) (*models.User, error)
+	Logout(userID string) error
+	VerifyEmail(token string) error
+	ResendVerification(email string) error
+	RequestPasswordReset(email string) error
+	ConfirmPasswordReset(token, newPassword string) error
+	GetProfile(userID string) (*models.User, error)
+	UpdateProfile(userID string, email string, req *models.UserUpdateRequest) error
+	UploadProfilePicture(userID, cdnURL string) error
 }
 
-func NewUserService(userRepo *repository.UserRepository) *UserService {
+type UserService struct {
+	userRepo repository.IUserRepository
+}
+
+func NewUserService(userRepo repository.IUserRepository) *UserService {
 	return &UserService{userRepo: userRepo}
 }
 
@@ -39,7 +51,7 @@ func (s *UserService) Signup(user *models.UserSignupRequest) error {
 		Gender:       user.Gender,
 		PhoneNumber:  user.PhoneNumber,
 		Address:      user.Address,
-		ImageURL: user.ImageURL,
+		ImageURL:     user.ImageURL,
 		// VerificationToken:  verificationToken,
 		// VerificationExpiry: time.Now().Add(24 * time.Hour).Unix(),
 	}
@@ -164,22 +176,17 @@ func (s *UserService) GetProfile(userID string) (*models.User, error) {
 }
 
 func (s *UserService) UpdateProfile(userID string, email string, req *models.UserUpdateRequest) error {
-	// Find the existing user by ID
 	user, err := s.userRepo.FindUserByID(userID)
 	if err != nil {
 		return errors.New(models.UserDoesntExist)
 	}
 
-	// Update only the mutable fields
 	user.Name = req.Name
 	user.Age = req.Age
 	user.Gender = req.Gender
 	user.Address = req.Address
 
-	fmt.Println("to be updated ", user)
-
-	// Call the repository to update the user in the database
-	return s.userRepo.UpdateUser(user) // Pass the updated user object
+	return s.userRepo.UpdateUser(user)
 }
 
 func (s *UserService) UploadProfilePicture(userID, cdnURL string) error {
