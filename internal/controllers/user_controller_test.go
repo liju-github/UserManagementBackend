@@ -26,14 +26,16 @@ func TestSignup(t *testing.T) {
 	userController := &UserController{userService: mockUserService}
 	app.Post("/signup", userController.Signup)
 
-	tests := []struct {
+	type TypeCase struct {
 		name               string
 		requestBody        models.UserSignupRequest
 		expectedStatusCode int
 		expectedResponse   string
 		returnError        error
 		expectSignupCall   bool
-	}{
+	}
+
+	tests := []TypeCase{
 		{
 			name: "successful signup",
 			requestBody: models.UserSignupRequest{

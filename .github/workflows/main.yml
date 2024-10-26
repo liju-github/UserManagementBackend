@@ -28,7 +28,7 @@ jobs:
             git pull origin main
           '
 
-      # Step 3: Build Go Application
+      # Step 3: Build Go Application aaa
       - name: Testing and Building Go Application
         env:
           EC2_USER: ${{ secrets.EC2_USER }}
